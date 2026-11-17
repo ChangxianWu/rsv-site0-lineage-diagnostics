@@ -26,6 +26,7 @@ credentials. Every sequence analysed is public and is re-downloaded by the scrip
 | Variant calling | codon-aware substitutions in the reference frame | `call_subs_from_aln.py` |
 | Trajectories | substitution frequency by year and country group | `traj_site0_by_year.py` |
 | Seasons | collection season and the analysis base | `seasonize_and_h1base.py`, `build_analysis_base_v1.py` |
+| Lineage share | B.D.E.1 marker-set share by collection season (Figure 2B / Table S11) | `make_season_lineage_table.py` |
 | Exposure model | primary model, sensitivity battery, bootstrap, permutation | `h1_frozen_outcome_run.py`, `h1_sensitivity_battery.py` |
 | Phylogeny | independent origins of lineage markers (Fitch parsimony) | `phylo_ed3.py` |
 | Diagnostics | exact/≤1/≤2 mismatch, 3′-proximal position profiles, Figure 4 | `h3_panel_audit_unified.py`, `h3_panel_mismatch_dist.py`, `h3_panel_position_profile.py`, `h3_probe_audit_pilot.py` |
