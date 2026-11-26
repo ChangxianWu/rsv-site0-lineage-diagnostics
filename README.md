@@ -1,73 +1,82 @@
-# Corrected AvR diagnostic component
+# Per-arm sequence compatibility of published RSV diagnostic oligonucleotides
 
-Owner: Changxian Wu (CW), College of Agriculture and Animal Husbandry Science and Technology, Ningxia Vocational and Technical College for Minorities, Wuzhong 751100, Ningxia, China. Contact: wchangx173@163.com.
+Analysis code for the manuscript:
 
-This two-file code package reproduces the corrected diagnostic oligonucleotide component from supplied, previously extracted RSV gene windows and ENA metadata. It is **component reproduction, not reproduction of the entire study**. It does not download sequences, reconstruct the input windows, assign subtypes, fit exposure models, infer phylogenies, or regenerate submission documents or figures. No sequence or metadata datasets or generated analysis tables are bundled. This local package does not establish that code or inputs have been publicly uploaded or deposited.
+> **Per-arm sequence compatibility of 17 published respiratory syncytial virus diagnostic
+> oligonucleotides with contemporary genomes: a reproducible in silico audit**
 
-## Requirements
+Submitted to the *Journal of Virological Methods*. Sole author and corresponding author:
+Changxian Wu, College of Agriculture and Animal Husbandry Science and Technology, Ningxia
+Vocational and Technical College for Minorities, Wuzhong 751100, Ningxia, China
+(wchangx173@163.com; ORCID 0000-0003-2486-3380).
 
-Python 3.10 or later, NumPy, and the third-party `regex` package. No pandas, Office software, aligner, or internet connection is required to execute the analysis once the dependencies and inputs are available.
+This repository contains analysis code only: no sequence data, no derived tables, no credentials.
+Every sequence analysed is public and is re-downloaded by the scripts in `scripts/`.
+
+---
+
+## Run the audit component (the part the paper reports)
+
+`audit_diagnostics.py` (repository root) reproduces the per-arm audit from four prepared inputs and
+writes a hashed provenance record. It is a single file with no dependency on the rest of the
+repository.
 
 ```bash
 python -m pip install numpy regex
+python -I audit_diagnostics.py --self-test-only        # 130 synthetic checks, no data needed
+python -I audit_diagnostics.py --input-dir /absolute/path/inputs \
+                              --output-dir /absolute/path/new_results
 ```
 
-Dependencies are not version-pinned in this two-file package. Each analysis writes its actual Python, NumPy, and regex versions, script hash, input hashes, and output hashes to `provenance.json`.
+Inputs, all placed directly in `--input-dir`:
 
-## Exact inputs
-
-Supply these four files directly inside the directory passed to `--input-dir`, preserving the filenames:
-
-| Filename | Required contents and selection |
+| File | Required content |
 |---|---|
-| `ena_rsv_meta_matrix_sp11250_2026-10-27.tsv` | Tab-separated ENA metadata with header columns `accession`, `collection_date`, and `first_public`; additional columns are allowed. Accessions must be unique after removing version suffixes. |
-| `win_M_full.fasta` | Existing orientation-normalized M-gene windows; script selects explicit subtype A headers. |
-| `win_L_B.fasta` | Existing orientation-normalized, **subtype-B-only** L-gene windows. Untagged headers are accepted on this assumption; an explicit non-B tag is excluded. |
-| `win_n_full.fasta` | Existing orientation-normalized N-gene windows; script selects explicit subtype B headers. Filename case is significant on case-sensitive filesystems. |
+| `ena_rsv_meta_matrix_sp11250_2026-10-27.tsv` | ENA metadata with `accession`, `collection_date`, `first_public` |
+| `win_M_full.fasta` | orientation-normalised M-gene windows, subtype A headers |
+| `win_L_B.fasta` | orientation-normalised L-gene windows, subtype B only |
+| `win_n_full.fasta` | orientation-normalised N-gene windows, subtype B headers |
 
-M and N headers must start with an accession and identify subtype, for example `>ACCESSION.1 A`, `>ACCESSION.1 B`, or `>ACCESSION.1 subtype=B`. For L, `>ACCESSION.1` is accepted only because the caller supplies an already subtype-B-only file. Sequences may span lines. They are uppercased; non-ACGT symbols remain ambiguous, not wildcards. A duplicate accession within a selected gene cohort is rejected. Metadata is joined by accession without its version suffix; records without matching metadata have unresolved dates and are excluded from annual analyses, with counts retained in provenance outputs.
+Outputs are the per-arm 2026 table, the annual tables, the drift table, the date-provenance
+counts, the per-record audit, and `provenance.json` (script hash, input hashes, output hashes,
+interpreter and library versions). Subtypes, window extraction and orientation normalisation are
+accepted as prepared-input assumptions; the script does not infer them.
 
-These are prepared intermediate inputs. Obtaining a current metadata download or independently extracting new windows does not guarantee the same cohort or results as a frozen input set. Archive the exact inputs separately with their provenance if numerical reproduction is required.
+Method in one sentence: each of the 17 published oligonucleotide arms is searched, in both
+orientations, against every window of its own gene and subtype, allowing substitutions only, and
+the mismatches of the best hit are resolved as positions measured from the arm's 3′ end.
 
-## Running
+---
 
-Run the script from a trusted working directory using absolute input/output paths. Keep input data separate from code.
+## The rest of the pipeline
 
-```bash
-python -I /absolute/path/code_release_avr_revision/audit_diagnostics.py --self-test-only
-python -I /absolute/path/code_release_avr_revision/audit_diagnostics.py --input-dir /absolute/path/inputs --output-dir /absolute/path/new_results
-```
+| Layer | Question | Script |
+|---|---|---|
+| Retrieval | all public human RSV nucleotide records | `download_ed3_nuccore_fasta.py` |
+| Windows | F-region windows by 12-mer seed density | `extract_f_windows.py` |
+| Windows | N-region windows | `extract_n_windows.py` |
+| Alignment input | reference frame and orientation normalisation | `prep_mafft_inputs.py` |
+| Variant calling | codon-aware substitutions in the reference frame | `call_subs_from_aln.py` |
+| Trajectories | substitution frequency by year and country group | `traj_site0_by_year.py` |
+| Seasons | collection season and the analysis base | `seasonize_and_h1base.py`, `build_analysis_base_v1.py` |
+| Marker share | B.D.E.1 marker-set share by collection season | `make_season_lineage_table.py` |
+| Audit (per arm) | reference-free exact and substitution-only search | `h3_panel_audit_unified.py` |
+| Audit (position) | position-resolved mismatch profiles | `h3_panel_position_profile.py` |
+| Audit (counts) | exact / one- / two-substitution distributions | `h3_panel_mismatch_dist.py` |
+| Audit (pilot) | first-pass probe audit and sanity checks | `h3_probe_audit_pilot.py` |
+| Phylogeny | F+G tree input and tree running | `phylo_ed3.py` |
+| Context model | exploratory programme-exposure model (not a result of this paper) | `h1_frozen_outcome_run.py`, `h1_sensitivity_battery.py` |
 
-`--selftest` is an alias for `--self-test-only`. Self-tests require no input data, create no result directory, and print the number passed. Analysis runs self-tests first. The module has a main guard: importing it does not start analysis or write results.
+Requirements are listed in `requirements.txt`. Reference sequences used for the F-region frame are
+in `scripts/refseq_rsv_fasta_2026-10-28.txt`.
 
-`--input-dir` and `--output-dir` are required for analysis. The result directory must be new or empty, outside the release directory, and separate from and not nested with the input directory. Existing results are not overwritten. The CLI reads and hashes only the four supplied inputs; it has no dependency on legacy analysis files, submission documents, or submission figures. Interrupted runs can leave partial results; use another empty directory to rerun. Input hashes are checked again after a successful run.
+---
 
-## Dates and denominators
+## Scope and limits
 
-Analysis covers calendar years 2015–2026; the detailed target year is 2026. These constants are fixed in the script. Collection dates are parsed first with calendar validation: `yyyy-mm-dd`, `yyyy-mm`, `yyyy`, `yyyy-Mon`, `Mon-yyyy`, and `dd-Mon-yyyy`, with English month abbreviations. Same-year ranges resolve a year; cross-year ranges do not specify one collection year. Missing or unparseable collection dates use a parsed `first_public` year only as an explicitly labelled fallback. **Publication year is not collection year.** Records with neither resolvable date are excluded from annual cohorts. All date sources, formats, fallback reasons, and counts are exported. A separate collection-date-only sensitivity excludes every publication fallback.
-
-The denominator `n` is the number of distinct accession records with a supplied gene/subtype window and the relevant year. It is fixed for every arm in that cohort/year. Ambiguous, too-short, or unmatched windows remain in `n`; records without that gene window are outside that cohort. Thus `n` is not the number of all available public genomes. Subtypes, window extraction, and orientation normalization are accepted as prepared-input assumptions and are not independently inferred by this component.
-
-## Matching and positions
-
-The 17 oligonucleotide arms are embedded in `ARMS`. The script searches both orientations for all overlapping equal-length, entirely A/C/G/T substrings within two substitutions, using `regex` constraints `{s<=2,i<=0,d<=0}` and independent Hamming checks. It retains all sites with the globally minimum distance. Insertions and deletions are not allowed. Ambiguous substrings cannot qualify as exact or approximate matches; an otherwise ambiguous window can still contain a qualifying canonical site.
-
-`p_exact`, `p_le1`, and `p_le2` are cumulative per-record fractions on the fixed denominator. No canonical hit within two substitutions can reflect ambiguity, missing sites, indels, or sequence divergence; it is not proof of three or more biological substitutions. Exact distances above two are not estimated.
-
-Positions are one-based from the original oligo's 3′ end: for zero-based oriented-query index `i`, forward position is `L-i`, reverse position is `i+1`. Output includes all `frac_pos_-1` through `frac_pos_-5`. `p_3prox` records a mismatch anywhere in those five bases. Internal positions exclude both terminal five-base regions; `frac_pos_internal` and `frac_pos_5p` count a record once per category, not once per mismatch. Categories are marginal and need not sum to an overall mismatch fraction.
-
-Primary position fractions use the union across tied best hits; `*_all_best_hits` requires the category in every tied hit. Positional disagreements are counted, and the per-record audit retains all hits plus a deterministic representative. Positions are observable only among canonical best hits within two substitutions. Unmatched records contribute no observed position; these frequencies are not complete positional mismatch prevalence. Whole-window best-site search does not establish a unique biological binding site. A composite primer arm's functional role must qualify positional interpretation.
-
-Annual exact-compatibility drift is descriptive weighted least squares of percentage versus **calendar year** during 2018–2026, weighted by annual `n`. Included years require `n >= 30`, at least three years spanning at least three years. Both collection-first and collection-only slopes are exported. Publication fallbacks and changes in sequence sampling can affect slopes; no causal or assay-performance conclusion follows.
-
-## Generated outputs
-
-- `per_arm_2026.tsv`: detailed collection-first results, including fallback counts, every positional marginal, ambiguity/unmatched counts, and tied-hit diagnostics. Fractions are stored on a 0–1 scale.
-- `per_arm_2026_collection_only.tsv`: target-year sensitivity without publication fallback.
-- `per_arm_by_year.tsv`: annual compatibility and position results for both date bases.
-- `exact_drift_2018_2026.tsv`: descriptive annual slopes and years/records used.
-- `date_source_counts.tsv` and `cohort_record_dates.tsv`: date provenance and cohort exclusions.
-- `per_record_audit.tsv.gz`: per-record/per-arm match evidence, source coordinates, and all best hits.
-- `synthetic_tests.json`, `methods_and_limitations.json`, and `provenance.json`: validation, definitions, and reproducibility metadata.
-
-The built-in tests cover exact and one/two/three substitutions, both orientations, terminal indexing, internal/5′ record marginals, indel and ambiguity handling, date parsing/fallbacks, tied sites, and comparison with exhaustive Hamming scans. These checks validate the component logic; they do not validate upstream extraction or demonstrate wet-lab performance. No wet-work results are generated or implied.
+- The repository reproduces the audit; it does not reproduce the deposit-level filtering that
+  produced the frozen window files, which are prepared intermediates described in the paper.
+- No sequence data or derived tables are deposited here. Obtaining a current download does not
+  guarantee the same cohort as the frozen one used in the paper.
+- The exploratory programme-exposure analysis in the supplement is context only; it is
+  inconclusive and the scripts are included for completeness, not as a reported result.
