@@ -1,173 +1,73 @@
-# Lineage replacement and diagnostic oligonucleotide divergence in RSV
+# Corrected AvR diagnostic component
 
-Analysis code for the manuscript:
+Owner: Changxian Wu (CW), College of Agriculture and Animal Husbandry Science and Technology, Ningxia Vocational and Technical College for Minorities, Wuzhong 751100, Ningxia, China. Contact: wchangx173@163.com.
 
-> **Lineage Replacement Underlies Site Ø Substitution Trends in Respiratory Syncytial Virus and
-> Diagnostic Oligonucleotide Divergence, 23 Countries, 2015–2026**
+This two-file code package reproduces the corrected diagnostic oligonucleotide component from supplied, previously extracted RSV gene windows and ENA metadata. It is **component reproduction, not reproduction of the entire study**. It does not download sequences, reconstruct the input windows, assign subtypes, fit exposure models, infer phylogenies, or regenerate submission documents or figures. No sequence or metadata datasets or generated analysis tables are bundled. This local package does not establish that code or inputs have been publicly uploaded or deposited.
 
-Submitted to the *Journal of Medical Virology*. Sole author and corresponding author:
-Changxian Wu, College of Agriculture and Animal Husbandry Science and Technology, Ningxia
-Vocational Technical College for Minorities, Wuzhong 751100, Ningxia, China
-(wchangx173@163.com).
+## Requirements
 
-This repository contains the analysis code only: no sequence data, no derived tables, no
-credentials. Every sequence analysed is public and is re-downloaded by the scripts below.
-
----
-
-## What the code does
-
-| Layer | Question | Script |
-|---|---|---|
-| Retrieval | all public human RSV nucleotide records | `download_ed3_nuccore_fasta.py` |
-| Windows | F-region windows by 12-mer seed density | `extract_f_windows.py` |
-| Windows | N-region windows (diagnostic probes) | `extract_n_windows.py` |
-| Alignment input | reference frame + orientation normalisation | `prep_mafft_inputs.py` |
-| Variant calling | codon-aware substitutions in the reference frame | `call_subs_from_aln.py` |
-| Trajectories | substitution frequency by year and country group | `traj_site0_by_year.py` |
-| Seasons | collection season and the analysis base | `seasonize_and_h1base.py`, `build_analysis_base_v1.py` |
-| Lineage share | B.D.E.1 marker-set share by collection season (Figure 2B / Table S11) | `make_season_lineage_table.py` |
-| Exposure model | primary model, sensitivity battery, bootstrap, permutation | `h1_frozen_outcome_run.py`, `h1_sensitivity_battery.py` |
-| Phylogeny | independent origins of lineage markers (Fitch parsimony) | `phylo_ed3.py` |
-| Diagnostics | exact/≤1/≤2 mismatch, 3′-proximal position profiles, Figure 4 | `h3_panel_audit_unified.py`, `h3_panel_mismatch_dist.py`, `h3_panel_position_profile.py`, `h3_probe_audit_pilot.py` |
-
-Two things this code deliberately does **not** do: it generates no neutralisation or
-amplification phenotypes (all diagnostic statements in the paper are in silico sequence
-compatibility), and it does not use GISAID data.
-
-## Environment
-
-```
-python >= 3.10
-pip install -r requirements.txt
-mafft >= 7.5      # --add --keeplength
-iqtree2 >= 2.2    # GTR+F+R2, --ufboot 1000 --bnni
-```
-
-`requirements.txt` covers requests, pandas, numpy, statsmodels, regex and matplotlib.
-MAFFT and IQ-TREE are external binaries and are not pip-installable.
-
-## Inputs
-
-**NCBI Nucleotide (fetched by script).** `download_ed3_nuccore_fasta.py` queries
-`txid11250[Organism]` through E-utilities, batches efetch at 200 UIDs, resumes between batches and
-writes a manifest with the file sha256. The taxonomy identifier is resolved from the scientific
-name on the day of retrieval: the same numeric identifier has been confused with rabies virus in
-this project's history, so always confirm that the returned `scientific_name` values contain
-"respiratory syncytial" before analysing anything.
-
-**ENA metadata matrix (not redistributed, 9.7 MB).** One call to the ENA Portal API reproduces it:
-
-```
-https://www.ebi.ac.uk/ena/portal/api/search
-  ?result=sequence
-  &query=tax_tree(12814)
-  &fields=accession,tax_id,scientific_name,country,collection_date,host,isolate,strain,
-          keywords,mol_type,sample_accession,study_accession,first_public,base_count
-  &format=tsv&limit=0
-```
-
-Save as `scripts/ena_rsv_meta_matrix_sp11250_2026-10-27.tsv` (tab-separated, header included).
-The matrix carries 71,842 rows; country is recorded for 94.9% and collection date for 90.6%.
-
-**Reference sequences.** `scripts/refseq_rsv_fasta_2026-10-28.txt` holds the two RefSeq genomes
-that anchor the coordinate frame: NC_038235.1 (subtype A) and NC_001781.1 (subtype B).
-
-## Running the pipeline
-
-All scripts resolve their working directory from `Path(__file__)`, so run them from `scripts/`
-and they read and write there; the downloaded FASTA goes to `../raw/`.
+Python 3.10 or later, NumPy, and the third-party `regex` package. No pandas, Office software, aligner, or internet connection is required to execute the analysis once the dependencies and inputs are available.
 
 ```bash
-cd scripts
-
-# 1. sequences (~74k records, resumable, NCBI rate limit respected)
-python download_ed3_nuccore_fasta.py
-
-# 2. windows
-python extract_f_windows.py        # -> f_windows_full_2026-10-28.fasta
-python extract_n_windows.py        # -> n_windows_full_2026-10-28.fasta
-
-# 3. reference frame and orientation
-python prep_mafft_inputs.py        # -> ref_A.fasta, ref_B.fasta, win_A_full.fasta, win_B_full.fasta
-
-# 4. reference-frame alignment (one per subtype; N region likewise against ref_N)
-mafft --add win_A_full.fasta --keeplength --anysymbol --thread -1 ref_A.fasta > aln_A_full.fasta
-mafft --add win_B_full.fasta --keeplength --anysymbol --thread -1 ref_B.fasta > aln_B_full.fasta
-
-# 5. substitutions in the reference frame
-python call_subs_from_aln.py aln_A_full.fasta A subs_A_full_2026-10-28.tsv 13320
-python call_subs_from_aln.py aln_B_full.fasta B subs_B_full_2026-10-28.tsv 11643
-
-# 6. trajectories, seasons, analysis base
-python traj_site0_by_year.py
-python seasonize_and_h1base.py
-python build_analysis_base_v1.py
-
-# 7. exposure models
-python h1_frozen_outcome_run.py
-python h1_sensitivity_battery.py
-
-# 8. phylogeny (F+G concatenation at 2,625 nt, then IQ-TREE with 1,000 UFBoot)
-python phylo_ed3.py prep
-iqtree2 -s tree_B_subset.fasta -m GTR+F+R2 --ufboot 1000 --bnni -T 4 --prefix tree_B
-python phylo_ed3.py fitch
-
-# 9. diagnostic oligonucleotide audit
-python h3_panel_audit_unified.py
-python h3_panel_mismatch_dist.py
-python h3_panel_position_profile.py
-python h3_probe_audit_pilot.py
+python -m pip install numpy regex
 ```
 
-### File-name map
+Dependencies are not version-pinned in this two-file package. Each analysis writes its actual Python, NumPy, and regex versions, script hash, input hashes, and output hashes to `provenance.json`.
 
-The assay layers use their own working names, so a few intermediates are renamed between steps.
-Nothing is recomputed; these are the same files under the names each script expects:
+## Exact inputs
 
-| Produced by | Renamed to | Used as |
-|---|---|---|
-| `prep_mafft_inputs.py` → `win_A_full.fasta` | `win_M_full.fasta` | subtype A multiplex arms (M) |
-| `prep_mafft_inputs.py` → `win_B_full.fasta` | `win_L_B.fasta` | subtype B LAMP arms (L) |
-| `extract_n_windows.py` → `n_windows_full_2026-10-28.fasta` | `win_n_full.fasta` | N-gene probes (N) |
-| MAFFT output for the N region | `aln_N_full.fasta` (reference row named `REF_N`) | probe audit |
+Supply these four files directly inside the directory passed to `--input-dir`, preserving the filenames:
 
-The alignment scripts expect the reference record to be named `REF_A`, `REF_B` or `REF_N`; rename
-the row after MAFFT, which carries over the name from `ref_X.fasta`.
+| Filename | Required contents and selection |
+|---|---|
+| `ena_rsv_meta_matrix_sp11250_2026-10-27.tsv` | Tab-separated ENA metadata with header columns `accession`, `collection_date`, and `first_public`; additional columns are allowed. Accessions must be unique after removing version suffixes. |
+| `win_M_full.fasta` | Existing orientation-normalized M-gene windows; script selects explicit subtype A headers. |
+| `win_L_B.fasta` | Existing orientation-normalized, **subtype-B-only** L-gene windows. Untagged headers are accepted on this assumption; an explicit non-B tag is excluded. |
+| `win_n_full.fasta` | Existing orientation-normalized N-gene windows; script selects explicit subtype B headers. Filename case is significant on case-sensitive filesystems. |
 
-## Reproducibility notes
+M and N headers must start with an accession and identify subtype, for example `>ACCESSION.1 A`, `>ACCESSION.1 B`, or `>ACCESSION.1 subtype=B`. For L, `>ACCESSION.1` is accepted only because the caller supplies an already subtype-B-only file. Sequences may span lines. They are uppercased; non-ACGT symbols remain ambiguous, not wildcards. A duplicate accession within a selected gene cohort is rejected. Metadata is joined by accession without its version suffix; records without matching metadata have unresolved dates and are excluded from annual analyses, with counts retained in provenance outputs.
 
-- **Determinism.** Subsampling is ordered by `sha256(accession)` rather than by an RNG; the
-  bootstrap and permutation use a fixed seed (`20261028`). Re-running produces the same tables.
-- **Denominators.** Marker frequencies use subtype B records with interpretable codons at every
-  marker position and a collection year in 2015–2026 (n = 10,174). Escape-candidate frequencies
-  use the aligned comparison set (n = 11,643). Subtype A comparisons use 13,320 records. The
-  marker sets are nested within the 10,174 denominator: B.D.E.1 6,269 ⊆ B.D.4.1.1 8,665 ⊆ I206M
-  carriers 9,127.
-- **Gap handling.** Records with more than 30 gapped codons are excluded from the denominator
-  rather than scored as wild type; the count is printed by `call_subs_from_aln.py`.
-- **Reference-era bias.** Diagnostic arms are searched directly in the orientation-normalised
-  window, not against a reference-aligned frame. Against the 1956 subtype B reference, three arms
-  falsely appear to have no exact match; the window search restores 92–96% compatibility.
-- **Aggregate tables.** The tables that back every reported value are the Supplementary Tables
-  S1–S10 of the manuscript; this repository regenerates them from public data.
+These are prepared intermediate inputs. Obtaining a current metadata download or independently extracting new windows does not guarantee the same cohort or results as a frozen input set. Archive the exact inputs separately with their provenance if numerical reproduction is required.
 
-## Changes made for release
+## Running
 
-The scripts are the analysis code as run, with four mechanical edits, each verified by comparing
-the abstract syntax tree against the working copy (logic identical):
+Run the script from a trusted working directory using absolute input/output paths. Keep input data separate from code.
 
-1. Module docstrings and comments translated to English (all other code untouched).
-2. `h3_panel_audit_unified.py`: figure output path changed from the internal Chinese build
-   directory to `figures/` (created if absent).
-3. `h1_sensitivity_battery.py`: one dead expression (`... if False else ""`) removed from a
-   formatted string; the emitted value is unchanged.
-4. `phylo_ed3.py`: two unused `import copy` statements removed.
+```bash
+python -I /absolute/path/code_release_avr_revision/audit_diagnostics.py --self-test-only
+python -I /absolute/path/code_release_avr_revision/audit_diagnostics.py --input-dir /absolute/path/inputs --output-dir /absolute/path/new_results
+```
 
-`build_analysis_base_v1.py` restates the step that assembled the frozen analysis base from the
-seasonised table; its column contract is stated in its docstring.
+`--selftest` is an alias for `--self-test-only`. Self-tests require no input data, create no result directory, and print the number passed. Analysis runs self-tests first. The module has a main guard: importing it does not start analysis or write results.
 
-## Licence and citation
+`--input-dir` and `--output-dir` are required for analysis. The result directory must be new or empty, outside the release directory, and separate from and not nested with the input directory. Existing results are not overwritten. The CLI reads and hashes only the four supplied inputs; it has no dependency on legacy analysis files, submission documents, or submission figures. Interrupted runs can leave partial results; use another empty directory to rerun. Input hashes are checked again after a successful run.
 
-No licence has been chosen yet; add a `LICENSE` file before making the repository public. When the
-paper is published, cite it instead of this repository. Contact: wchangx173@163.com.
+## Dates and denominators
+
+Analysis covers calendar years 2015–2026; the detailed target year is 2026. These constants are fixed in the script. Collection dates are parsed first with calendar validation: `yyyy-mm-dd`, `yyyy-mm`, `yyyy`, `yyyy-Mon`, `Mon-yyyy`, and `dd-Mon-yyyy`, with English month abbreviations. Same-year ranges resolve a year; cross-year ranges do not specify one collection year. Missing or unparseable collection dates use a parsed `first_public` year only as an explicitly labelled fallback. **Publication year is not collection year.** Records with neither resolvable date are excluded from annual cohorts. All date sources, formats, fallback reasons, and counts are exported. A separate collection-date-only sensitivity excludes every publication fallback.
+
+The denominator `n` is the number of distinct accession records with a supplied gene/subtype window and the relevant year. It is fixed for every arm in that cohort/year. Ambiguous, too-short, or unmatched windows remain in `n`; records without that gene window are outside that cohort. Thus `n` is not the number of all available public genomes. Subtypes, window extraction, and orientation normalization are accepted as prepared-input assumptions and are not independently inferred by this component.
+
+## Matching and positions
+
+The 17 oligonucleotide arms are embedded in `ARMS`. The script searches both orientations for all overlapping equal-length, entirely A/C/G/T substrings within two substitutions, using `regex` constraints `{s<=2,i<=0,d<=0}` and independent Hamming checks. It retains all sites with the globally minimum distance. Insertions and deletions are not allowed. Ambiguous substrings cannot qualify as exact or approximate matches; an otherwise ambiguous window can still contain a qualifying canonical site.
+
+`p_exact`, `p_le1`, and `p_le2` are cumulative per-record fractions on the fixed denominator. No canonical hit within two substitutions can reflect ambiguity, missing sites, indels, or sequence divergence; it is not proof of three or more biological substitutions. Exact distances above two are not estimated.
+
+Positions are one-based from the original oligo's 3′ end: for zero-based oriented-query index `i`, forward position is `L-i`, reverse position is `i+1`. Output includes all `frac_pos_-1` through `frac_pos_-5`. `p_3prox` records a mismatch anywhere in those five bases. Internal positions exclude both terminal five-base regions; `frac_pos_internal` and `frac_pos_5p` count a record once per category, not once per mismatch. Categories are marginal and need not sum to an overall mismatch fraction.
+
+Primary position fractions use the union across tied best hits; `*_all_best_hits` requires the category in every tied hit. Positional disagreements are counted, and the per-record audit retains all hits plus a deterministic representative. Positions are observable only among canonical best hits within two substitutions. Unmatched records contribute no observed position; these frequencies are not complete positional mismatch prevalence. Whole-window best-site search does not establish a unique biological binding site. A composite primer arm's functional role must qualify positional interpretation.
+
+Annual exact-compatibility drift is descriptive weighted least squares of percentage versus **calendar year** during 2018–2026, weighted by annual `n`. Included years require `n >= 30`, at least three years spanning at least three years. Both collection-first and collection-only slopes are exported. Publication fallbacks and changes in sequence sampling can affect slopes; no causal or assay-performance conclusion follows.
+
+## Generated outputs
+
+- `per_arm_2026.tsv`: detailed collection-first results, including fallback counts, every positional marginal, ambiguity/unmatched counts, and tied-hit diagnostics. Fractions are stored on a 0–1 scale.
+- `per_arm_2026_collection_only.tsv`: target-year sensitivity without publication fallback.
+- `per_arm_by_year.tsv`: annual compatibility and position results for both date bases.
+- `exact_drift_2018_2026.tsv`: descriptive annual slopes and years/records used.
+- `date_source_counts.tsv` and `cohort_record_dates.tsv`: date provenance and cohort exclusions.
+- `per_record_audit.tsv.gz`: per-record/per-arm match evidence, source coordinates, and all best hits.
+- `synthetic_tests.json`, `methods_and_limitations.json`, and `provenance.json`: validation, definitions, and reproducibility metadata.
+
+The built-in tests cover exact and one/two/three substitutions, both orientations, terminal indexing, internal/5′ record marginals, indel and ambiguity handling, date parsing/fallbacks, tied sites, and comparison with exhaustive Hamming scans. These checks validate the component logic; they do not validate upstream extraction or demonstrate wet-lab performance. No wet-work results are generated or implied.
