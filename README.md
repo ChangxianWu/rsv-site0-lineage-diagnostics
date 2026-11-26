@@ -1,9 +1,9 @@
-# Per-arm sequence compatibility of published RSV diagnostic oligonucleotides
+# Sequence compatibility and mismatch profiles of RSV diagnostic primers and probes
 
 Analysis code for the manuscript:
 
-> **Per-arm sequence compatibility of 17 published respiratory syncytial virus diagnostic
-> oligonucleotides with contemporary genomes: a reproducible in silico audit**
+> **Sequence compatibility and mismatch profiles of respiratory syncytial virus
+> diagnostic primers and probes**
 
 Submitted to the *Journal of Virological Methods*. Sole author and corresponding author:
 Changxian Wu, College of Agriculture and Animal Husbandry Science and Technology, Ningxia
@@ -17,15 +17,14 @@ Every sequence analysed is public and is re-downloaded by the scripts in `script
 
 ## Run the audit component (the part the paper reports)
 
-`audit_diagnostics.py` (repository root) reproduces the per-arm audit from four prepared inputs and
-writes a hashed provenance record. It is a single file with no dependency on the rest of the
-repository.
+`scripts/audit_diagnostics.py` reproduces the per-arm audit from four prepared inputs and writes a
+hashed provenance record. It is a single file with no dependency on the rest of the repository.
 
 ```bash
 python -m pip install numpy regex
-python -I audit_diagnostics.py --self-test-only        # 130 synthetic checks, no data needed
-python -I audit_diagnostics.py --input-dir /absolute/path/inputs \
-                              --output-dir /absolute/path/new_results
+python -I scripts/audit_diagnostics.py --self-test-only        # 130 synthetic checks, no data needed
+python -I scripts/audit_diagnostics.py --input-dir /absolute/path/inputs \
+                                      --output-dir /absolute/path/new_results
 ```
 
 Inputs, all placed directly in `--input-dir`:
